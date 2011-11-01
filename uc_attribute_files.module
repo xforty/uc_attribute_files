@@ -142,7 +142,7 @@ function uc_attribute_files_form_uc_attribute_form_alter(&$form, $form_state) {
 */
 function uc_attribute_files_form_uc_attribute_options_form_form_alter(&$form, $form_state) {
   if (count($form['#parameters']) < 1) {
-    break;
+    return;
   }
   foreach ($form['#parameters'] as $id => $param) {
     if ($param->display == UC_ATTRIBUTE_FILES_TYPE) {
@@ -157,7 +157,7 @@ function uc_attribute_files_form_uc_attribute_options_form_form_alter(&$form, $f
 */
 function uc_attribute_files_form_uc_attribute_option_form_form_alter(&$form, $form_state) {
   if (count($form['#parameters']) < 1) {
-    break;
+    return;
   }
 
   foreach ($form['#parameters'] as $id => $param) {
