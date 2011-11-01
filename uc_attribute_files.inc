@@ -23,13 +23,8 @@ function uc_attribute_files_admin() {
     t('Operations'),
   );
 
-  $display_types = array(
-    0                  => t('Text field'),
-    1                  => t('Select box'),
-    2                  => t('Radio buttons'),
-    3                  => t('Checkboxes'),
-    UC_ATTRIBUTE_FILES_TYPE => t('File Upload'),
-  );
+  $display_types = _uc_attribute_display_types();
+  $display_types[UC_ATTRIBUTE_FILES_TYPE] = t('File Upload');
 
   $result = pager_query("SELECT a.aid, a.name, a.label, a.required, a.ordering,
                           a.display, COUNT(ao.oid) AS options
