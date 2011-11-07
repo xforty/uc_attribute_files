@@ -37,6 +37,15 @@ function uc_attribute_files_menu_alter(&$items) {
   $items['admin/store/attributes/overview']['page callback'] = 'uc_attribute_files_admin';
   $items['admin/store/attributes/overview']['file'] = 'uc_attribute_files.inc';
   $items['admin/store/attributes/overview']['module'] = 'uc_attribute_files';
+  $items['uc_attribute_files/js/%/%'] = array(
+	'page callback' => '_uc_attribute_files_ahah',
+	'access callback' => TRUE,
+	'type' => MENU_CALLBACK,
+	'page arguments' => array(2, 3),
+//    'access callback' => 'filefield_edit_access',
+//    'access arguments' => array(2, 3),
+	);
+  return $items;
 }
 
 /**
@@ -92,6 +101,28 @@ function uc_attribute_files_form_alter(&$form, $form_state, $form_id) {
             $form['attributes'][$field_name]['#type'] = 'file';
             // unset the parents nesting
             $form['attributes'][$field_name]['#parents'] = array($field_name);
+            $form['attributes'][$field_name]['#prefix'] = '<div id="uc_attribute_files-wrapper">';
+            $form['attributes'][$field_name]['#suffix'] = '</div>';
+            //$form['attributes'][$field_name]['#attributes']['#enctype'] = 'multipart/form-data';
+            $form['attributes']['upload'] = array(
+		'#type' => 'submit',
+		'#value' => 'Upload',
+//		'#prefix' => '<div id="uc_attribute_files-wrapper">',
+//		'#suffix' => '</div>',
+		'#ahah' => array(
+			'event' => 'click',
+			'path' => 'uc_attribute_files/js/' . $field_name . '/' . $id,
+			'wrapper' => 'uc_attribute_files-wrapper',
+			'method' => 'replace',
+			'effect' => 'fade',
+			'progress' => array(
+				'type' => 'bar',
+				'message' => t('Loading...'),
+			),
+		),
+		'#attributes' => array( '#enctype' => 'multipart/form-data' ),
+		'#execute_submit_handler' => TRUE
+	    );
             // remove the old field - move it to a value
             $form['attributes'][$id]['#type'] = 'value';
           }
@@ -99,6 +130,102 @@ function uc_attribute_files_form_alter(&$form, $form_state, $form_id) {
       }
     }
   }
+}
+
+function _uc_attribute_files_ahah($field_name, $id)
+{
+	//set this to whatever you like.  Keep slash at end, don't add one at beginning
+	//if you don't want to use a preset, just unset it.
+	$icpreset = 'imagecache/test_preset/';
+	//$icpreset = '';
+
+	//this handles situation where user clicks upload multiple times
+	$field_key = $field_name;
+	$form_build_id = $_POST['form_build_id'];
+	$form_state = array( 'submitted' => FALSE );
+	if(!$form = form_get_cache($form_build_id, $form_state))
+	{
+		exit();
+	}
+	if(empty($_FILES))//$form['attributes'][$field_name]))
+	{
+		$form_state = array( 'submitted' => FALSE );
+		$form = form_builder($form['#id'], $form, $form_state);
+		$upload_stuff = $form['attributes'][$id];
+		$upload_stuff['#type'] = 'file';
+		$upload_stuff['#parents'] = array($field_name);
+		$output = drupal_render($upload_stuff);
+		return drupal_json(array('status' => TRUE, 'data' => $output));
+	}
+	if($form['attributes'][$field_name]['#attributes']['_uc_a_f_special'])
+	{
+		$field_key = $id;
+		$_FILES['files'] = $_FILES['attributes'];
+	}
+	//end multiple upload click handling
+
+
+	//copy the file to files/user-files, render output, and set new form_state
+	$filename = $_FILES['files']['name'][$field_key];
+	$parts = explode('.', $filename);
+	if(empty($parts)) // then no '.' in the file...  maybe handle this differently
+	{
+		return drupal_json(array('status' => TRUE, 'data' => "File must have an image extension."));
+	}
+	//this will be handy for validating
+	$extn = array_pop($parts);
+	$name = implode('.', $parts);
+
+	//the current, temp location of the upload
+	$tmp = $_FILES['files']['tmp_name'][$field_key];
+	$srvdir = $_SERVER['DOCUMENT_ROOT'] . '/' . file_directory_path() . '/user-files';
+
+	$newname = $name;
+	$i = 0;
+	while(file_exists($srvdir . '/' . $newname . '.' . $extn))
+	{
+		$newname = $name . '_' . $i;
+		$i++;
+	}
+	$finalname = $newname . '.' . $extn;
+	$finalpath = file_directory_path() . '/user-files/' . $finalname;
+
+	//copy & create drupal file record
+	if(copy($tmp, $srvdir . '/' . $finalname));
+	{
+		global $user;
+		$file = new stdClass();
+		$file->filemime = $_FILES['files']['type'][$field_key];
+		$file->filename = $finalname;
+		$file->filepath = $finalpath;
+		$file->filesize = filesize($srvdir . '/' . $finalname);
+		$file->uid = $user->uid;
+		$file->status = FILE_STATUS_PERMANENT;
+		$file->timestamp = time();
+		drupal_write_record('files', $file);
+	}
+
+	//render image output using imagecache preset
+	$output .= '<img src="/system/files/' . $icpreset . 'user-files/' . $finalname . '">';
+
+	//and set the form data
+	$form_build_id = $_POST['form_build_id'];
+	$form_state = array( 'submitted' => FALSE );
+	if(!$form = form_get_cache($form_build_id, $form_state))
+	{
+		exit();
+	}
+	//set a flag in form so subsequent calls know it's a repeat
+	if( !isset($form['attributes'][$field_name]['#attributes']) )
+	{
+		$form['attributes'][$field_name]['#attributes'] = array();
+	}
+	$form['attributes'][$field_name]['#attributes']['_uc_a_f_special'] = TRUE;
+	$form['attributes'][$field_name]['#attributes']['_uc_file_attrib'] = $file->fid;
+	$form_state['values']['file_attributes'][$id] = $file->fid;
+	form_set_cache($form_build_id, $form, $form_state);
+
+	return drupal_json(array('status' => TRUE, 'data' => $output));
 }
 
 /**
@@ -147,7 +274,7 @@ function uc_attribute_files_form_uc_attribute_form_alter(&$form, $form_state) {
 */
 function uc_attribute_files_form_uc_attribute_options_form_form_alter(&$form, $form_state) {
   if (count($form['#parameters']) < 1) {
-    return;
+    break;
   }
   foreach ($form['#parameters'] as $id => $param) {
     if ($param->display == UC_ATTRIBUTE_FILES_TYPE) {
@@ -162,7 +289,7 @@ function uc_attribute_files_form_uc_attribute_options_form_form_alter(&$form, $f
 */
 function uc_attribute_files_form_uc_attribute_option_form_form_alter(&$form, $form_state) {
   if (count($form['#parameters']) < 1) {
-    return;
+    break;
   }
 
   foreach ($form['#parameters'] as $id => $param) {
@@ -316,6 +443,22 @@ function uc_attribute_files_cart_submit($form, &$form_state) {
 
   // Allow other modules to intervene.
   drupal_alter('user_files_validators', $validators);
+
+/*	begin xforty mod to submit function */
+
+	foreach ($form_state['values']['node']->attributes as $attribute)
+	{
+		if (user_access('upload attribute files') &&
+			user_access('own and manage a private file repository') &&
+			$attribute->display == UC_ATTRIBUTE_FILES_TYPE &&
+			!empty($form['attributes']['attributes_' . $attribute->aid]['#attributes']['_uc_file_attrib']))
+		{
+			$form_state['values']['file_attributes'] = array( $attribute->aid => $form['attributes']['attributes_' . $attribute->aid]['#attributes']['_uc_file_attrib']);
+		return;
+		}
+	}
+	
+/*	end xforty mod */
   // Save new file uploads.
   foreach ($form_state['values']['node']->attributes as $attribute) {
     if (user_access('upload attribute files') &&
