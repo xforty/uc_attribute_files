@@ -136,7 +136,7 @@ function _uc_attribute_files_ahah($field_name, $id)
 {
 	//set this to whatever you like.  Keep slash at end, don't add one at beginning
 	//if you don't want to use a preset, just unset it.
-	$icpreset = 'imagecache/test_preset/';
+	$icpreset = 'imagecache/product/';
 	//$icpreset = '';
 
 	//this handles situation where user clicks upload multiple times
