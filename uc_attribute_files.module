@@ -95,6 +95,74 @@ function uc_attribute_files_form_alter(&$form, $form_state, $form_id) {
             // Unfortunately file elements don't support being part of #TREE so
             // we have to provide unique field names
             $field_name = 'attributes_'. $id;
+	/*begin ugly hack to preserve ordering*/
+	$attribs = $form['attributes'];
+	$front = array();
+	$back = array();
+	$flag = FALSE;
+	foreach($attribs as $key=>$attrib)
+	{
+		if(!$flag)
+		{
+			$front[$key] = $attrib;
+		}
+		else
+		{
+			$back[$key] = $attrib;
+		}
+		if($key == $id)
+		{
+			$flag = TRUE;
+		}
+	}
+            // clone the existing field
+	    $mid = array();
+            $mid[$field_name] = $form['attributes'][$id];
+            // make it a file
+            $mid[$field_name]['#type'] = 'file';
+            // unset the parents nesting
+            $mid[$field_name]['#parents'] = array($field_name);
+            $mid[$field_name]['#prefix'] = '<div id="uc_attribute_files-wrapper">';
+            $mid[$field_name]['#suffix'] = '</div>';
+            $mid[$field_name]['#weight'] = $form['attributes'][$id]['#weight'];
+            //$form['attributes'][$field_name]['#attributes']['#enctype'] = 'multipart/form-data';
+            $mid['upload'] = array(
+		'#type' => 'submit',
+		'#value' => 'Upload',
+//		'#weight' => (int) 0,
+//		'#prefix' => '<div id="uc_attribute_files-wrapper">',
+//		'#suffix' => '</div>',
+		'#ahah' => array(
+			'event' => 'click',
+			'path' => 'uc_attribute_files/js/' . $field_name . '/' . $id,
+			'wrapper' => 'uc_attribute_files-wrapper',
+			'method' => 'replace',
+			'effect' => 'fade',
+			'progress' => array(
+				'type' => 'bar',
+				'message' => t('Loading...'),
+			),
+		),
+		'#attributes' => array( '#enctype' => 'multipart/form-data' ),
+		'#execute_submit_handler' => TRUE
+	    );
+            // remove the old field - move it to a value
+	$form['attributes'] = array();
+	foreach($front as $key=>$val)
+	{
+		$form['attributes'][$key] = $val;
+	}
+	foreach($mid as $key=>$val)
+	{
+		$form['attributes'][$key] = $val;
+	}
+	foreach($back as $key=>$val)
+	{
+		$form['attributes'][$key] = $val;
+	}
+        $form['attributes'][$id]['#type'] = 'value';
+	/*end ugly hack*/
+/*
             // clone the existing field
             $form['attributes'][$field_name] = $form['attributes'][$id];
             // make it a file
@@ -103,10 +171,12 @@ function uc_attribute_files_form_alter(&$form, $form_state, $form_id) {
             $form['attributes'][$field_name]['#parents'] = array($field_name);
             $form['attributes'][$field_name]['#prefix'] = '<div id="uc_attribute_files-wrapper">';
             $form['attributes'][$field_name]['#suffix'] = '</div>';
+            $form['attributes'][$field_name]['#weight'] = $form['attributes'][$id]['#weight'];
             //$form['attributes'][$field_name]['#attributes']['#enctype'] = 'multipart/form-data';
             $form['attributes']['upload'] = array(
 		'#type' => 'submit',
 		'#value' => 'Upload',
+//		'#weight' => (int) 0,
 //		'#prefix' => '<div id="uc_attribute_files-wrapper">',
 //		'#suffix' => '</div>',
 		'#ahah' => array(
@@ -125,6 +195,7 @@ function uc_attribute_files_form_alter(&$form, $form_state, $form_id) {
 	    );
             // remove the old field - move it to a value
             $form['attributes'][$id]['#type'] = 'value';
+*/
           }
         }
       }
