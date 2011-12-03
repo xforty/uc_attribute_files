@@ -451,7 +451,9 @@ function uc_attribute_files_product_description_alter(&$item, $product) {
         if ($file) {
           $url = _user_files_generate_url($file->filepath);
           // Override the value 
-          $item['attributes'][$form_key]['#options'][0] = l($file->filename, $url);
+          $item['attributes'][$form_key]['#attribute_name'] = $attribute->label;
+          $item['attributes'][$form_key]['#options'][0]['filename'] = l($file->filename, $url);
+          //$item['attributes'][$form_key]['#options'][0] = l($file->filename, $url);
           $item['attributes'][$form_key]['#html'] = TRUE;
           // Override the theming so we can pass through the url without a check_plain
           $item['attributes']['#theme'] = 'uc_product_attributes_files';
@@ -581,8 +583,8 @@ function theme_uc_product_attributes_files($element) {
   $option_rows = array();
   foreach (element_children($element) as $key) {
     $optionstr = '';
-
-    foreach ((array)$element[$key]['#options'] as $option) {
+    foreach ((array) array_shift($element[$key]['#options']) as $option) {
+//    foreach ((array) $element[$key]['#options'] as $option) {
       // We only need to allow translation from the second option onward
       if (empty($optionstr)) {
         $optionstr .= $option;
@@ -598,7 +600,6 @@ function theme_uc_product_attributes_files($element) {
       $option_rows[$key] = t('@attribute: @option', array('@attribute' => $element[$key]['#attribute_name'], '@option' => $optionstr));
     }
   }
-
   if (!empty($option_rows)) {
     return theme('item_list', array_values($option_rows), NULL, 'ul', array('class' => 'product-description'));
   }
