@@ -9,6 +9,13 @@
  * @todo Fix http://localhost/drupal/?q=node/6/edit/options so notes on use with file upload is output
  * @todo Adjust the price of items in the cart based on the extension of the option chosen
  */
+
+/*******************************************************
+ * Includes
+ *******************************************************/
+
+module_load_include('inc', 'uc_attribute', 'uc_attribute.admin');
+
 /*******************************************************
  * Constants
  *******************************************************/
@@ -577,32 +584,36 @@ function uc_attribute_files_cart_submit($form, &$form_state) {
  * Theme callbacks
 **********************************************/
 /**
- * Theme override for the module so we can show our elements as links if needs be
-*/
+ * Theme override for the module so we can show our elements as links if needs be.
+ * Only renders uc_attribute_files options. Then it calls theme_uc_product_attributes
+ * to render the other options.
+ */
 function theme_uc_product_attributes_files($element) {
   $option_rows = array();
+  // each attribute
   foreach (element_children($element) as $key) {
-    $optionstr = '';
-    foreach ((array) array_shift($element[$key]['#options']) as $option) {
-//    foreach ((array) $element[$key]['#options'] as $option) {
-      // We only need to allow translation from the second option onward
-      if (empty($optionstr)) {
-        $optionstr .= $option;
+    $options = $element[$key]['#options'];
+    // each attribute option
+    foreach ($options as $option) {
+      // only render if uc_attribute_files option determined by existence
+      // of a 'filename' key in the option array
+      if (is_array($option) && array_key_exists('filename', $option)) {
+        if (!empty($element[$key]['#html'])) {
+          $option_rows[$key] = t('@attribute: !option', array('@attribute' => $element[$key]['#attribute_name'], '!option' => $option['filename']));
+        } else {
+          $option_rows[$key] = t('@attribute: @option', array('@attribute' => $element[$key]['#attribute_name'], '@option' => $option['filename']));
+        }
+        // unset this key so we don't print duplicates
+        unset($element[$key]);
       }
-      else {
-        $optionstr .= t(', !option', array('!option' => $option));
-      }
-    }
-    if (!empty($element[$key]['#html'])) {
-      $option_rows[$key] = t('@attribute: !option', array('@attribute' => $element[$key]['#attribute_name'], '!option' => $optionstr));
-    }
-    else {
-      $option_rows[$key] = t('@attribute: @option', array('@attribute' => $element[$key]['#attribute_name'], '@option' => $optionstr));
     }
   }
+  $item_list = '';
+  // render the uc_attribute_files options as a list
   if (!empty($option_rows)) {
-    return theme('item_list', array_values($option_rows), NULL, 'ul', array('class' => 'product-description'));
+    $item_list = theme('item_list', array_values($option_rows), NULL, 'ul', array('class' => 'product-description'));
   }
-
-  return '';
+  // render the other attributes and their options
+  $item_list .= theme_uc_product_attributes($element);
+  return $item_list;
 }
