@@ -235,21 +235,27 @@ function _uc_attribute_files_ahah($field_name, $id)
 		$output = drupal_render($upload_stuff);
 		return drupal_json(array('status' => TRUE, 'data' => $output));
 	}
-	if($form['attributes'][$field_name]['#attributes']['_uc_a_f_special'])
-	{
+	if($form['attributes'][$field_name]['#attributes']['_uc_a_f_special']
+      && !empty($_FILES['attributes'])) {
 		$field_key = $id;
-		$_FILES['files'] = $_FILES['attributes'];
+	  $_FILES['files'] = $_FILES['attributes'];
 	}
 	//end multiple upload click handling
 
+  // Get the filename
+  $filename = $_FILES['files']['name'][$field_key];
+
+  // return a message if we can't figure out the filename
+  if (empty($filename)) {
+    return drupal_json(array('status' => TRUE, 'data' => "Unable to determine filename."));
+  }
 
 	//copy the file to files/user-files, render output, and set new form_state
-	$filename = $_FILES['files']['name'][$field_key];
 	$parts = explode('.', $filename);
-	if(empty($parts)) // then no '.' in the file...  maybe handle this differently
-	{
+	if(empty($parts)) { // then no '.' in the file...  maybe handle this differently
 		return drupal_json(array('status' => TRUE, 'data' => "File must have an image extension."));
 	}
+
 	//this will be handy for validating
 	$extn = array_pop($parts);
 	$name = implode('.', $parts);
@@ -281,6 +287,16 @@ function _uc_attribute_files_ahah($field_name, $id)
 		$file->status = FILE_STATUS_PERMANENT;
 		$file->timestamp = time();
 		drupal_write_record('files', $file);
+
+    // if anonymous user, associate file with them so they can view it
+    if ($user->uid == 0) {
+      $result = _user_files_assoc_anon($file->fid);
+      if ($result == FALSE) {
+        drupal_set_message(t('Could not associate anonymous user with file'));
+        watchdog('user_files', t('Could not associate anonymous user with file'));
+        form_set_error('', t('Session failure'));
+      }
+    }
 	}
 
 	//render image output using imagecache preset
